@@ -26,6 +26,7 @@ func _initialize() -> void:
 		"test_customers_only_ask_for_stock",
 		"test_profit_and_average_helpers",
 		"test_save_round_trip",
+		"test_reputation_grows_orders",
 		"test_all_visitor_and_good_art_exists",
 	]:
 		call(t)
@@ -256,3 +257,17 @@ func test_save_round_trip() -> void:
 	_check(not h.has_save(), "delete removes the save")
 	g.free()
 	h.free()
+
+
+func test_reputation_grows_orders() -> void:
+	var g := _game()
+	var biggest := func(price: float) -> int:
+		var top := 0
+		for i in 300:
+			top = maxi(top, g.order_size(price))
+		return top
+	g.rep = 50
+	_check(biggest.call(10.0) == 3 and biggest.call(100.0) == 1, "average name: 1-3 cheap, 1 dear")
+	g.rep = 90
+	_check(biggest.call(10.0) == 5 and biggest.call(100.0) == 3, "great name: two more of each")
+	g.free()

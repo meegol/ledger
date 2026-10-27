@@ -23,7 +23,7 @@ const MINUTES_PER_SECOND := 6.0 ## One in-game hour is ten real seconds.
 const START_GOLD := 150
 const START_REP := 60
 const FIRST_RENT := 120
-const RENT_GROWTH := 1.8
+const RENT_GROWTH := 1.35
 const RENT_EVERY := 7
 const RUMOUR_CHANCE := 0.65
 const RANDOM_RAID_CHANCE := 0.07
@@ -262,6 +262,14 @@ func make_customer() -> Dictionary:
 	return c
 
 
+## How many units a customer asks for. Cheap goods sell by the handful, and
+## a good name brings bigger orders: one more for every 20 reputation over 50.
+func order_size(unit_price: float) -> int:
+	var most := 3 if unit_price < 30.0 else 1
+	most += maxi(0, floori((rep - 50) / 20.0))
+	return 1 + rng.randi() % most
+
+
 ## Points the customer at something in stock, preferring what they came for,
 ## and trims the quantity to what you hold. Returns false if the stall is empty.
 func fit_to_stock(c: Dictionary) -> bool:
@@ -277,7 +285,7 @@ func fit_to_stock(c: Dictionary) -> bool:
 	var wanted: Array = held.filter(func(id): return id in v.get("wants", held))
 	var pool: Array = wanted if not wanted.is_empty() else held
 	var good: String = pool[rng.randi() % pool.size()]
-	var qty := 1 + (rng.randi() % 3 if market.price[good] < 30.0 else 0)
+	var qty := order_size(market.price[good])
 	c["good"] = good
 	c["qty"] = mini(qty, stock[good])
 	var offer := roundi(market.price[good] * rng.randf_range(0.88, 1.28) * v["pay"])

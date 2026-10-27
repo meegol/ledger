@@ -8,7 +8,7 @@ A pixel-art merchant sim made in Godot 4.7. You run a market stall where prices 
 
 - **Market:** eight goods, each with a fair price. Every in-game hour the live price moves part of the way toward fair, plus some random noise. You buy at the ask and sell back at the bid, so trading back and forth costs you the spread.
 - **Rumours:** each evening the square talks about tomorrow: a dragon, raiders, plague, a festival, a storm, a silver rush, a blood moon, a caravan, a royal wedding. Most rumours come true, but not all. Events change fair prices and foot traffic, so stocking up on the right rumour is where the money is.
-- **Customers:** offer a price for some quantity. You can sell, haggle (they may walk off) or refuse. Overcharging hurts your reputation.
+- **Customers:** offer a price for some quantity. You can sell, haggle (they may walk off) or refuse. Overcharging hurts your reputation. A good reputation brings bigger orders.
 - **Night customers (after 20:00):**
   - **Vampire:** pays well. Refuse and it bites you, and you lose 90 minutes.
   - **Ghost:** pays triple in ghost gold. Only 20–80% of it survives sunrise.
