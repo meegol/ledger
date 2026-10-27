@@ -2,7 +2,7 @@
 
 A pixel-art merchant sim made in Godot 4.7. You run a market stall where prices move like a real market. Buy stock on the wholesale board, sell to whoever walks up, and pay the landlord every seven days. The rent goes up every time.
 
-**[Play it in the browser](https://ledger-virid-two.vercel.app)**
+**[Play it in the browser](https://ledger-merchant.vercel.app)**
 
 ## How it plays
 
