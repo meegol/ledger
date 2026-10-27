@@ -23,7 +23,7 @@ const MINUTES_PER_SECOND := 6.0 ## One in-game hour is ten real seconds.
 const START_GOLD := 150
 const START_REP := 60
 const FIRST_RENT := 120
-const RENT_GROWTH := 1.4
+const RENT_GROWTH := 1.8
 const RENT_EVERY := 7
 const RUMOUR_CHANCE := 0.65
 const RANDOM_RAID_CHANCE := 0.07
@@ -239,7 +239,7 @@ func total_units() -> int:
 func arrival_rate() -> float:
 	if minute < SHOP_OPEN:
 		return 0.0
-	var base := 0.035 if not is_night() else 0.02
+	var base := 0.024 if not is_night() else 0.015
 	base *= Events.traffic(event_today)
 	base *= lerpf(0.6, 1.3, rep / 100.0)
 	return base
@@ -280,7 +280,7 @@ func fit_to_stock(c: Dictionary) -> bool:
 	var qty := 1 + (rng.randi() % 3 if market.price[good] < 30.0 else 0)
 	c["good"] = good
 	c["qty"] = mini(qty, stock[good])
-	var offer := roundi(market.price[good] * rng.randf_range(0.95, 1.35) * v["pay"])
+	var offer := roundi(market.price[good] * rng.randf_range(0.88, 1.28) * v["pay"])
 	c["offer"] = maxi(offer, 0 if c["who"] == "wolf" else 1)
 	return true
 

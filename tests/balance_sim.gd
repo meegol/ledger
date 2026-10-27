@@ -28,10 +28,11 @@ func _initialize() -> void:
 
 
 func _play_day(g: Node) -> void:
-	# Morning: buy whatever is cheap against its fair price, keep a rent reserve.
+	# Morning: buy whatever has dipped over the last six hours (all a player
+	# can see; the fair price is hidden), keeping a reserve for rent.
 	var reserve: int = g.rent if g.days_to_rent() <= 2 else 0
 	for id in Goods.ids():
-		while g.market.ask(id) < g.market.fair(id) * 1.02 and g.gold - g.market.ask(id) > reserve \
+		while g.market.change(id) <= 0.0 and g.gold - g.market.ask(id) > reserve \
 				and g.stock[id] < 6:
 			g.buy_stock(id, 1)
 	# Trading hours: customers at the modelled rate, until 22:00.
