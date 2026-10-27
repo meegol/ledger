@@ -166,6 +166,9 @@ func sell_stock(id: String, qty: int = 1) -> bool:
 	if stock[id] < qty:
 		return false
 	var got := market.bid(id) * qty
+	var pl := profit_on(id, qty, market.bid(id))
+	message.emit("Sold %d %s back for %dg (%s)." % [qty, Goods.name_of(id), got, pl_text(pl)],
+		"good" if pl >= 0 else "bad")
 	_remove_stock(id, qty)
 	gold += got
 	today["revenue"] += got
@@ -179,6 +182,32 @@ func _remove_stock(id: String, qty: int) -> void:
 	stock[id] -= qty
 	if stock[id] == 0:
 		avg_cost[id] = 0.0
+
+
+## Profit (or loss, if negative) from selling `qty` at `unit_price` each,
+## measured against what you paid on average.
+func profit_on(id: String, qty: int, unit_price: float) -> float:
+	return (unit_price - avg_cost[id]) * qty
+
+
+## What your average cost would become after buying `qty` more at the ask.
+func avg_after_buying(id: String, qty: int = 1) -> float:
+	return (avg_cost[id] * stock[id] + market.ask(id) * qty) / float(stock[id] + qty)
+
+
+## Paper profit on everything you hold if you sold it back at the bid now.
+func unrealized() -> float:
+	var total := 0.0
+	for id in Goods.ids():
+		total += profit_on(id, stock[id], market.bid(id))
+	return total
+
+
+static func pl_text(amount: float) -> String:
+	var n := roundi(amount)
+	if n == 0:
+		return "break even"
+	return ("+%dg profit" if n > 0 else "%dg loss") % n
 
 
 func stock_value() -> int:
@@ -271,6 +300,7 @@ func sell_to(c: Dictionary) -> String:
 	if stock[id] < qty:
 		return "You don't have enough %s." % Goods.name_of(id)
 	var total: int = c["offer"] * qty
+	var pl := profit_on(id, qty, c["offer"])
 	_remove_stock(id, qty)
 	today["sold"] += qty
 	var line := ""
@@ -287,10 +317,10 @@ func sell_to(c: Dictionary) -> String:
 			var markup: float = c["offer"] / market.price[id]
 			if markup > 1.35 and not Visitors.is_odd(c["who"]):
 				_change_rep(-3)
-				line = "Sold for %dg. Steep, and they'll tell their friends." % total
+				line = "Sold for %dg (%s). Steep, and they'll tell their friends." % [total, pl_text(pl)]
 			else:
 				_change_rep(1)
-				line = "Sold for %dg." % total
+				line = "Sold for %dg (%s)." % [total, pl_text(pl)]
 	changed.emit()
 	return line
 
@@ -515,3 +545,4 @@ func _roll_rumour() -> String:
 
 func days_to_rent() -> int:
 	return rent_day - day
+

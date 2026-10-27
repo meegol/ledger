@@ -1,27 +1,37 @@
 class_name MarketPanel
 extends PanelContainer
 
-## The wholesale board: live price, 6-hour trend, what you hold and what you
-## paid, with buy and sell-back buttons. Shift-click trades five.
+## The wholesale board: live price, 6-hour trend, what you hold at what
+## average cost, and buy and sell-back buttons. Holdings are green when
+## selling back now would make a profit and red when it would lose money.
+## Shift-click trades five.
 
 signal traded(id: String, bought: bool)
 
-var _rows := {} ## good -> {price, trend, held, buy, sell}
+const COLS := [["", 32], ["", 56], ["price", 36], ["6h", 44], ["held", 60], ["buy", 40], ["sell", 40]]
+
+var _rows := {} ## good -> {price, trend, held, buy, sell, row}
+var _worth: Label
 
 
 func _ready() -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 2)
 	add_child(v)
+	v.add_child(Style.label("MARKET", Style.WARN))
 	var head := HBoxContainer.new()
-	head.add_child(Style.label("MARKET", Style.WARN))
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(spacer)
-	head.add_child(Style.label("held", Style.DIM))
+	head.add_theme_constant_override("separation", 4)
+	for col in COLS:
+		var l := Style.label(col[0], Style.DIM)
+		l.custom_minimum_size.x = col[1]
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if col[0] in ["price", "held"] \
+			else HORIZONTAL_ALIGNMENT_CENTER
+		head.add_child(l)
 	v.add_child(head)
 	for id in Goods.ids():
 		v.add_child(_row(id))
+	_worth = Style.label()
+	v.add_child(_worth)
 	v.add_child(Style.label("Shift-click: x5", Style.DIM))
 	Game.changed.connect(refresh)
 	refresh()
@@ -30,24 +40,27 @@ func _ready() -> void:
 func _row(id: String) -> Control:
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 4)
-	h.tooltip_text = Goods.name_of(id)
 	h.add_child(Style.icon(Goods.icon_of(id)))
 	var name_l := Style.label(Goods.name_of(id))
-	name_l.custom_minimum_size.x = 70
+	name_l.custom_minimum_size.x = COLS[1][1]
 	h.add_child(name_l)
 	var price := Style.label()
-	price.custom_minimum_size.x = 40
+	price.custom_minimum_size.x = COLS[2][1]
 	price.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	h.add_child(price)
 	var trend := Style.label()
-	trend.custom_minimum_size.x = 50
+	trend.custom_minimum_size.x = COLS[3][1]
+	trend.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	h.add_child(trend)
 	var held := Style.label()
-	held.custom_minimum_size.x = 30
+	held.custom_minimum_size.x = COLS[4][1]
 	held.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	held.mouse_filter = Control.MOUSE_FILTER_PASS
 	h.add_child(held)
 	var buy := Style.button("Buy", _trade.bind(id, true))
+	buy.custom_minimum_size.x = COLS[5][1]
 	var sell := Style.button("Sell", _trade.bind(id, false))
+	sell.custom_minimum_size.x = COLS[6][1]
 	h.add_child(buy)
 	h.add_child(sell)
 	_rows[id] = {"price": price, "trend": trend, "held": held, "buy": buy, "sell": sell, "row": h}
@@ -69,24 +82,45 @@ func _trade(id: String, buying: bool) -> void:
 
 
 func refresh() -> void:
+	var m := Game.market
 	for id in _rows:
 		var r: Dictionary = _rows[id]
-		var m := Game.market
+		var good_name := Goods.name_of(id)
+		var held: int = Game.stock[id]
 		r["price"].text = str(roundi(m.price[id]))
 		var ch := m.change(id)
 		if absf(ch) < 0.03:
-			r["trend"].text = " ="
+			r["trend"].text = "="
 			r["trend"].add_theme_color_override("font_color", Style.DIM)
 		else:
 			r["trend"].text = ("+" if ch > 0 else "") + str(roundi(ch * 100)) + "%"
 			r["trend"].add_theme_color_override("font_color", Style.GOOD if ch > 0 else Style.BAD)
-		r["held"].text = str(Game.stock[id]) if Game.stock[id] > 0 else "-"
+
+		var pl := Game.profit_on(id, held, m.bid(id))
+		if held > 0:
+			r["held"].text = "%d @%s" % [held, _money(Game.avg_cost[id])]
+			r["held"].add_theme_color_override("font_color", Style.GOOD if pl >= 0 else Style.BAD)
+			r["held"].tooltip_text = "%d %s, paid %.1fg each on average.\nSelling all back now: %s." \
+				% [held, good_name, Game.avg_cost[id], Game.pl_text(pl)]
+		else:
+			r["held"].text = "-"
+			r["held"].add_theme_color_override("font_color", Style.DIM)
+			r["held"].tooltip_text = ""
+
 		r["buy"].text = "%d" % m.ask(id)
-		r["buy"].tooltip_text = "Buy one %s for %dg" % [Goods.name_of(id), m.ask(id)]
+		var buy_tip := "Buy one %s for %dg." % [good_name, m.ask(id)]
+		if held > 0:
+			buy_tip += "\nYour average goes from %.1fg to %.1fg." % [Game.avg_cost[id], Game.avg_after_buying(id)]
+		r["buy"].tooltip_text = buy_tip
 		r["sell"].text = "%d" % m.bid(id)
-		r["sell"].disabled = Game.stock[id] == 0
-		var paid := ""
-		if Game.stock[id] > 0:
-			paid = "\nYou hold %d, paid %.1fg each on average." % [Game.stock[id], Game.avg_cost[id]]
-		r["sell"].tooltip_text = "Sell one back for %dg%s" % [m.bid(id), paid]
-		r["row"].tooltip_text = Goods.name_of(id) + paid
+		r["sell"].disabled = held == 0
+		r["sell"].tooltip_text = "Sell one back for %dg: %s." % [m.bid(id), Game.pl_text(Game.profit_on(id, 1, m.bid(id)))] \
+			if held > 0 else "Nothing to sell."
+
+	var paper := Game.unrealized()
+	_worth.text = "Stock worth %dg   %s" % [Game.stock_value(), "on paper " + Game.pl_text(paper) if Game.total_units() > 0 else ""]
+	_worth.add_theme_color_override("font_color", Style.DIM if Game.total_units() == 0 else (Style.GOOD if paper >= 0 else Style.BAD))
+
+
+static func _money(v: float) -> String:
+	return "%.1f" % v if v < 10.0 else str(roundi(v))

@@ -24,6 +24,7 @@ func _initialize() -> void:
 		"test_bones_moves_gold_by_bet",
 		"test_raid_steals_capped_by_purse",
 		"test_customers_only_ask_for_stock",
+		"test_profit_and_average_helpers",
 		"test_all_visitor_and_good_art_exists",
 	]:
 		call(t)
@@ -210,3 +211,16 @@ func test_customers_only_ask_for_stock() -> void:
 	g.stock["fish"] = 1
 	_check(g.fit_to_stock(c2) and c2["good"] == "fish" and c2["qty"] == 1, "re-fits when stock sold out in the queue")
 	g.free()
+
+
+func test_profit_and_average_helpers() -> void:
+	var g := _game()
+	g.stock["iron"] = 2
+	g.avg_cost["iron"] = 20.0
+	_check(is_equal_approx(g.profit_on("iron", 2, 26), 12.0), "profit is (price - avg) x qty")
+	_check(g.profit_on("iron", 1, 15) < 0, "selling under average is a loss")
+	var ask: int = g.market.ask("iron")
+	_check(is_equal_approx(g.avg_after_buying("iron"), (40.0 + ask) / 3.0), "average after buying one more")
+	_check(g.pl_text(12) == "+12g profit" and g.pl_text(-3) == "-3g loss" and g.pl_text(0.2) == "break even", "pl wording")
+	g.free()
+

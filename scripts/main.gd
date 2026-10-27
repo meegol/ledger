@@ -22,6 +22,7 @@ var _dialog: PanelContainer
 var _face: TextureRect
 var _who: Label
 var _line: Label
+var _pl: Label
 var _sell: Button
 var _haggle: Button
 var _refuse: Button
@@ -132,6 +133,20 @@ func _update_sell(d: Dictionary) -> void:
 		_sell.text = "Sell %dg" % (d["offer"] * d["qty"]) if not short else "Out of stock"
 	_sell.disabled = short
 	_sell.tooltip_text = "You have %d %s." % [have, Goods.name_of(d["good"])]
+	# What this sale does to the ledger, against the average you paid.
+	var id: String = d["good"]
+	var pl := Game.profit_on(id, d["qty"], d["offer"])
+	var paid := "Avg paid %.1fg. " % Game.avg_cost[id]
+	match d["who"]:
+		"wolf":
+			_pl.text = "Feeding it costs you %dg of meat." % roundi(Game.avg_cost[id] * d["qty"])
+			_pl.add_theme_color_override("font_color", Style.GHOST)
+		"ghost":
+			_pl.text = paid + "On paper %s, if the coin lasts." % Game.pl_text(pl)
+			_pl.add_theme_color_override("font_color", Style.GHOST)
+		_:
+			_pl.text = paid + "This sale: " + Game.pl_text(pl) + "."
+			_pl.add_theme_color_override("font_color", Style.GOOD if pl >= 0 else Style.BAD)
 
 
 func _on_sell() -> void:
@@ -391,14 +406,14 @@ func _build_ui() -> void:
 	top.add_child(_hud)
 
 	var market := MarketPanel.new()
-	market.position = Vector2(600, 30)
-	market.size = Vector2(360, 420)
+	market.position = Vector2(580, 30)
+	market.size = Vector2(380, 420)
 	market.traded.connect(func(_id, bought): Sfx.play("buy" if bought else "coin"))
 	root.add_child(market)
 
 	var bottom := PanelContainer.new()
 	bottom.position = Vector2(0, 450)
-	bottom.size = Vector2(600, 90)
+	bottom.size = Vector2(580, 90)
 	root.add_child(bottom)
 	var bv := VBoxContainer.new()
 	bv.add_theme_constant_override("separation", 0)
@@ -411,8 +426,8 @@ func _build_ui() -> void:
 	bv.add_child(_log)
 
 	var side := PanelContainer.new()
-	side.position = Vector2(600, 450)
-	side.size = Vector2(360, 90)
+	side.position = Vector2(580, 450)
+	side.size = Vector2(380, 90)
 	root.add_child(side)
 	var sv := HBoxContainer.new()
 	sv.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -428,8 +443,8 @@ func _build_ui() -> void:
 		sv.add_child(b)
 
 	_dialog = PanelContainer.new()
-	_dialog.position = Vector2(12, 321)
-	_dialog.size = Vector2(576, 120)
+	_dialog.position = Vector2(12, 311)
+	_dialog.size = Vector2(556, 130)
 	_dialog.add_theme_stylebox_override("panel", Style.box(Style.PANEL, Style.INK, 12, 9))
 	_dialog.visible = false
 	root.add_child(_dialog)
@@ -448,6 +463,8 @@ func _build_ui() -> void:
 	_line = Style.wrap("")
 	_line.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	dv.add_child(_line)
+	_pl = Style.wrap("")
+	dv.add_child(_pl)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	_sell = Style.button("Sell", _on_sell)
@@ -492,7 +509,7 @@ func _say(text: String, kind: String = "info") -> void:
 	var colors := {"info": Style.INK, "good": Style.GOOD, "bad": Style.BAD, "warn": Style.WARN, "odd": Style.GHOST}
 	var l := Style.label(text, colors.get(kind, Style.INK))
 	l.clip_text = true
-	l.custom_minimum_size.x = 570
+	l.custom_minimum_size.x = 550
 	_log.add_child(l)
 	while _log.get_child_count() > LOG_LINES - 1:
 		var old := _log.get_child(0)
@@ -527,8 +544,9 @@ func _debug_jump() -> void:
 		"":
 			_show_intro()
 		"day":
-			Game.stock["fish"] = 4
-			Game.stock["meat"] = 2
+			Game.buy_stock("fish", 4)
+			Game.buy_stock("meat", 2)
+			Game.market.price["fish"] *= 1.3
 			_start_day()
 			Game.minute = 10 * 60
 			for i in 3:
