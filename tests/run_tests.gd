@@ -25,6 +25,7 @@ func _initialize() -> void:
 		"test_raid_steals_capped_by_purse",
 		"test_customers_only_ask_for_stock",
 		"test_profit_and_average_helpers",
+		"test_save_round_trip",
 		"test_all_visitor_and_good_art_exists",
 	]:
 		call(t)
@@ -224,3 +225,34 @@ func test_profit_and_average_helpers() -> void:
 	_check(g.pl_text(12) == "+12g profit" and g.pl_text(-3) == "-3g loss" and g.pl_text(0.2) == "break even", "pl wording")
 	g.free()
 
+
+func test_save_round_trip() -> void:
+	var g := _game(5)
+	g.save_path = "user://test_save.json"
+	g.gold = 321
+	g.day = 9
+	g.minute = 14 * 60
+	g.stock["gem"] = 3
+	g.avg_cost["gem"] = 111.5
+	g.rep = 44
+	g.wolf_friend = true
+	g.rent = 168
+	g.rent_day = 14
+	g.market.price["gem"] = 150.25
+	g.rumour_tomorrow = "dragon"
+	g.save_game()
+	var next_roll: int = g.rng.randi()
+	var next_market_roll: int = g.market.rng.randi()
+	var h := _game(99)
+	h.save_path = g.save_path
+	_check(h.save_summary() == {"day": 9, "gold": 321}, "summary reads day and gold")
+	_check(h.load_game(), "load succeeds")
+	_check(h.gold == 321 and h.day == 9 and h.minute == 14 * 60 and h.rep == 44, "basic state restored")
+	_check(h.stock["gem"] == 3 and is_equal_approx(h.avg_cost["gem"], 111.5), "ledger restored")
+	_check(h.wolf_friend and h.rent == 168 and h.rent_day == 14 and h.rumour_tomorrow == "dragon", "flags restored")
+	_check(is_equal_approx(h.market.price["gem"], 150.25), "market prices restored")
+	_check(h.rng.randi() == next_roll and h.market.rng.randi() == next_market_roll, "random streams continue exactly")
+	h.delete_save()
+	_check(not h.has_save(), "delete removes the save")
+	g.free()
+	h.free()

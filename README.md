@@ -16,6 +16,8 @@ A pixel-art merchant sim made in Godot 4.7. You run a market stall where prices 
 - **Raids:** raiders come for your strongbox at night. Click them to fight them off. Hit one while it runs away and you get the stolen gold back.
 - **Angry mob:** if your reputation drops below 30, a mob can turn up during the day. You can pay them off, hand out goods, or chase them off in the same click-to-defend minigame.
 - **Tavern:** Bones dice with an old gambler, open from 18:00. Ties go to the house; snake eyes pays 5x.
+- **Ledger:** the board shows your average buy price for everything you hold, in green or red depending on whether selling back now would make or lose money. Customer offers show the profit or loss before you accept, and the buy button shows how a purchase would change your average.
+- **Saving:** the game autosaves every in-game hour and each morning. Continue from the title screen.
 - **Sleep:** you can go to bed from 18:00. If you're still up at midnight you pass out in the street: pickpockets take a quarter of your gold and you wake late.
 
 ## Run

@@ -35,6 +35,7 @@ var _rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
 	_rng.randomize()
+	Game.autosave = true
 	add_child(sky)
 	town = Town.new()
 	town.position = Vector2(0, 30)
@@ -236,6 +237,10 @@ func _go_to_bed(collapsed: bool) -> void:
 		Game.wolf_friend = false
 		await _fade(true)
 	var report := Game.start_next_day(collapsed)
+	if Game.over:
+		Game.delete_save()
+	elif Game.autosave:
+		Game.save_game()
 	_show_report(report, night, raid_line)
 	await _fade(false)
 
@@ -526,10 +531,19 @@ func _show_intro() -> void:
 	v.add_child(Style.wrap("Your uncle left you his market stall, and his landlord. Rent is due every seven days, and it goes up each time."))
 	v.add_child(Style.wrap("Buy goods on the market board. Sell them to whoever walks up, and haggle if you dare. Listen to rumours: a dragon sends iron soaring, a storm makes fish dear."))
 	v.add_child(Style.wrap("After dark, stranger customers come. Get to bed before midnight, or wake up in the gutter with lighter pockets.", Style.GHOST))
-	v.add_child(Style.button("Open the stall", func():
+	var saved := Game.save_summary()
+	if not saved.is_empty():
+		v.add_child(Style.button("Continue: day %d, %dg" % [saved["day"], saved["gold"]], func():
+			holder.queue_free()
+			Game.load_game()
+			_say("Welcome back. Day %d, %s." % [Game.day, Game.clock_text()], "warn")
+			_start_day()))
+	v.add_child(Style.button("New game" if not saved.is_empty() else "Open the stall", func():
 		holder.queue_free()
+		Game.new_game()
 		_say("Day 1. Stock up before the customers arrive.", "warn")
 		_start_day()))
+	v.add_child(Style.label("The game saves every in-game hour and each morning.", Style.DIM))
 
 
 # --- Debug -------------------------------------------------------------------------
@@ -540,6 +554,7 @@ func _debug_jump() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--ledger="):
 			jump = a.get_slice("=", 1)
+			Game.autosave = false # Don't let test jumps clobber a real save.
 	match jump:
 		"":
 			_show_intro()

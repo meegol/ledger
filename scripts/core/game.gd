@@ -29,6 +29,7 @@ const RUMOUR_CHANCE := 0.65
 const RANDOM_RAID_CHANCE := 0.07
 const MOB_REP := 30
 const PASS_OUT_LOSS := 0.25
+const SAVE_VERSION := 1
 
 var rng := RandomNumberGenerator.new()
 var market: Market
@@ -54,6 +55,8 @@ var rent_day := RENT_EVERY
 var over := false
 
 var today := {} ## Running totals for the day summary.
+var autosave := false ## Set by the stall scene; tests leave it off.
+var save_path := "user://save.json"
 var _clock_accum := 0.0
 
 
@@ -130,6 +133,8 @@ func _on_hour() -> void:
 		mob_done_today = true
 		mob_arrived.emit()
 	hour_passed.emit(hour)
+	if autosave and running:
+		save_game()
 
 
 func clock_text() -> String:
@@ -546,3 +551,75 @@ func _roll_rumour() -> String:
 func days_to_rent() -> int:
 	return rent_day - day
 
+
+# --- Saving -------------------------------------------------------------------
+
+func has_save() -> bool:
+	return FileAccess.file_exists(save_path)
+
+
+func save_game() -> void:
+	var data := {
+		"v": SAVE_VERSION, "day": day, "minute": minute, "gold": gold, "ghost_gold": ghost_gold,
+		"rep": rep, "stock": stock, "avg_cost": avg_cost, "event_today": event_today,
+		"rumour_tomorrow": rumour_tomorrow, "raid_tonight": raid_tonight,
+		"wolf_friend": wolf_friend, "mob_done_today": mob_done_today,
+		"warned_today": warned_today, "rent": rent, "rent_day": rent_day, "today": today,
+		"price": market.price, "history": market.history,
+		# 64-bit states don't survive JSON numbers, so they travel as strings.
+		"rng": str(rng.state), "market_rng": str(market.rng.state),
+	}
+	var f := FileAccess.open(save_path, FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify(data))
+
+
+## Day and gold of the saved run, for the continue button. {} if none.
+func save_summary() -> Dictionary:
+	var data := _read_save()
+	return {} if data.is_empty() else {"day": int(data["day"]), "gold": int(data["gold"])}
+
+
+func load_game() -> bool:
+	var data := _read_save()
+	if data.is_empty():
+		return false
+	new_game()
+	day = int(data["day"])
+	minute = int(data["minute"])
+	gold = int(data["gold"])
+	ghost_gold = int(data["ghost_gold"])
+	rep = int(data["rep"])
+	for id in Goods.ids():
+		stock[id] = int(data["stock"].get(id, 0))
+		avg_cost[id] = float(data["avg_cost"].get(id, 0.0))
+		market.price[id] = float(data["price"].get(id, market.price[id]))
+		market.history[id] = data["history"].get(id, [market.price[id]])
+	event_today = data["event_today"]
+	market.event_id = event_today
+	rumour_tomorrow = data["rumour_tomorrow"]
+	raid_tonight = data["raid_tonight"]
+	wolf_friend = data["wolf_friend"]
+	mob_done_today = data["mob_done_today"]
+	warned_today = data["warned_today"]
+	rent = int(data["rent"])
+	rent_day = int(data["rent_day"])
+	today = data["today"]
+	rng.state = String(data["rng"]).to_int()
+	market.rng.state = String(data["market_rng"]).to_int()
+	changed.emit()
+	return true
+
+
+func delete_save() -> void:
+	if has_save():
+		DirAccess.remove_absolute(save_path)
+
+
+func _read_save() -> Dictionary:
+	if not has_save():
+		return {}
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(save_path))
+	if not parsed is Dictionary or parsed.get("v", 0) != SAVE_VERSION:
+		return {}
+	return parsed
